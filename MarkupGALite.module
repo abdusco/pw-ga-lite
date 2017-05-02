@@ -1,0 +1,191 @@
+<?php namespace ProcessWire;
+
+/**
+ *
+ * @method renderTrackingCode(array $options, bool $inject) string
+ * */
+class MarkupGALite extends WireData implements Module, ConfigurableModule
+{
+    const PLACE_BODY = 1;
+    const PLACE_HEAD = 2;
+
+    public static function getModuleInfo()
+    {
+        return [
+            'title' => 'Google Analytics Lite',
+            'summary' => 'Adds Google Analytics tracking to pages using GALite',
+            'version' => '0.0.1',
+            'author' => 'abdus',
+            'href' => 'https://abdus.co',
+            'icon' => 'bar-chart',
+            'requires' => 'ProcessWire>=3.0',
+            'autoload' => true
+        ];
+    }
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        // provide default values before they're populated with user values
+        $this->set('placement', $this::PLACE_HEAD);
+        $this->set('trackingId', '');
+        $this->set('anonymizeIp', 1);
+        $this->set('inject', '');
+        $this->set('selector', '');
+    }
+
+    public function ready()
+    {
+        // do nothing if it is admin page
+        if (strpos($this->page->url, $this->config->urls->admin) === 0) return;
+
+        // do nothing if page does not match the selector.
+        if (!empty($this->selector) // and it shouldn't be empty
+            && !$this->page->matches($this->selector)
+        ) return;
+
+        // do not inject the code if tracking ID is not filled
+        bd(empty($this->trackingId));
+        if (!empty($this->trackingId)) {
+            // Hook into ___render() method in Page class
+            $this->addHookAfter('Page::render', $this, 'onPageRender');
+        } else {
+            $this->warning("$this: Tracking ID is not filled, tracking code will not be injected", true);
+        }
+    }
+
+    protected function onPageRender(HookEvent $e)
+    {
+        $markup = $e->return;
+
+        // figure out the position to place the script
+        $pointer = $this->placement === $this::PLACE_BODY ? '</body>' : '</head>';
+        $pos = strpos($markup, $pointer);
+        if (!$pos) return;
+
+        $options = [
+            'trackingId' => $this->trackingId,
+            'anonymizeIp' => !!$this->anonymizeIp // force boolean
+        ];
+
+        $code = $this->renderTrackingCode($options, !!$this->inject);
+
+        // Place the script before head or body
+        $e->return = str_replace($pointer, $code . $pointer, $e->return);
+    }
+
+    public function ___renderTrackingCode(array $options, $inject = false)
+    {
+        $code = "";
+
+        $scriptPath = __DIR__ . '/ga-lite/ga-lite.min.js';
+        if ($inject && file_exists($scriptPath)) {
+            // inject the script
+            $js = file_get_contents($scriptPath);
+            $code .= "<script>$js</script>";
+        } else {
+            // link the script
+            $scriptUrl = $this->config->urls->$this . "ga-lite/ga-lite.min.js";
+            $code .= "<script src='$scriptUrl'></script>";
+        }
+
+        // we're injecting the configuration in JSON format
+        $json = json_encode($options);
+        $code .= "<script>
+                var galite = galite = {};
+                
+                (function(){
+                    var conf = $json;
+                    galite.UA = conf.trackingId;
+                    galite.anonymizeIp = conf.anonymizeIp;
+                })();
+                 </script>";
+
+        return $code;
+    }
+
+    public function getModuleConfigInputfields(InputfieldWrapper $wrapper)
+    {
+        // TRACKING ID ====================
+        /* @var $tracking InputfieldText */
+        $tracking = $this->modules->InputfieldText;
+        $tracking->name = 'trackingId';
+        $tracking->label = $this->_('Tracking ID');
+        $tracking->value = $this->trackingId;
+
+        $tracking->description = $this->_('The UA code from your Google Analytics admin panel.');
+        $tracking->notes = $this->_('See [here](https://support.google.com/analytics/answer/1008080#trackingID) to learn how to set up a tracking ID.');
+        $tracking->placeholder = 'UA-XXXXX';
+        $tracking->required = true;
+        $tracking->columnWidth = 50;
+        // fill the field with saved value, or put empty string
+        $wrapper->add($tracking);
+
+        // ANONYMIZE IP ====================
+        /* @var $anonymize InputfieldCheckbox */
+        $anonymize = $this->modules->InputfieldCheckbox;
+        $anonymize->name = 'anonymizeIp';
+        $anonymize->label = $this->_('Anonymize IPs');
+        // check if field is populated, default to checked
+        $anonymize->attr('checked', $this->anonymizeIp);
+
+        $anonymize->description = $this->_('Sets the aip flag that advices GA to anonymize the IP address');
+        $anonymize->notes = $this->_('See here for more [info on `anonymizeIp`](Sets the aip flag that advices GA to anonymize the IP address)');
+        $anonymize->columnWidth = 50;
+        $wrapper->add($anonymize);
+
+        // =================================
+        // ADVANCED CONFIGURATION
+        // =================================
+
+        /* @var $advanced InputfieldWrapper */
+        $advanced = $this->modules->InputfieldFieldset;
+        $advanced->label = $this->_('Advanced Settings');
+        $advanced->description = $this->_('These settings are not required');
+        $advanced->collapsed = Inputfield::collapsedBlank;
+
+
+        // SELECTOR =================
+        /* @var $selector InputfieldSelector */
+        $selector = $this->modules->InputfieldSelector;
+        $selector->name = 'selector';
+        $selector->label = $this->_('Select pages');
+        // fill it with any value saved before
+        $selector->value = $this->selector;
+
+        $selector->description = $this->_('Build a selector for pages to put the tracking code');
+        $selector->notes = $this->_('By default tracking code will be injected into every page except admin pages');
+        $advanced->add($selector);
+
+
+        // INJECT SCRIPT ====================
+        /* @var $inject InputfieldCheckbox */
+        $inject = $this->modules->InputfieldCheckbox;
+        $inject->name = 'inject';
+        $inject->label = $this->_('Inject script');
+        $inject->description = $this->_('Write GALite js file directly into HTML, instead of linking it.');
+        $inject->notes = $this->_("Since the library is less than a KB in size, it won't slow down the page a lot, but it won't be cacheable either.");
+        // check if field is populated
+        $inject->attr('checked', $this->inject);
+        $inject->columnWidth = 50;
+        $advanced->add($inject);
+
+        // PLACEMENT ==================
+        /* @var $place InputfieldRadios */
+        $place = $this->modules->InputfieldRadios;
+        $place->name = 'placement';
+        $place->label = $this->_('Placement');
+        $place->description = $this->_('Select whether to place scripts before `</head>` or `</body>`');
+        $place->notes = $this->_("Placing scripts in `</head>` is recommended, but it's render blocking. But putting it before `</body>` may not detect partial loads for heavy pages.");
+        $place->addOption($this::PLACE_HEAD, $this->_('Before `</head>`'));
+        $place->addOption($this::PLACE_BODY, $this->_('Before `</body>`'));
+        $place->value = $this->placement;
+        $place->columnWidth = 50;
+        $advanced->add($place);
+
+        // add the advanced container to wrapper
+        $wrapper->add($advanced);
+        return $wrapper;
+    }
+}
