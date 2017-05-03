@@ -1,12 +1,15 @@
 <?php namespace ProcessWire;
 
 /**
- *
+ * Class MarkupGALite
+ * @package ProcessWire
  * @method renderTrackingCode(array $options, bool $inject) string
- * */
+ */
 class MarkupGALite extends WireData implements Module, ConfigurableModule
 {
+    // place scripts before the end of body
     const PLACE_BODY = 1;
+    // place scripts before the end of head
     const PLACE_HEAD = 2;
 
     public static function getModuleInfo()
@@ -19,22 +22,29 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
             'href' => 'https://abdus.co',
             'icon' => 'bar-chart',
             'requires' => 'ProcessWire>=3.0',
-            'autoload' => true
+            'autoload' => true // set true to load module on every request
         ];
     }
 
+    /**
+     * MarkupGALite constructor.
+     * summary Sets default options before they are replaced with user provided values
+     */
     public function __construct()
     {
+        // let parent set defaults first
         parent::__construct();
-
-        // provide default values before they're populated with user values
+        // then override with our values
         $this->set('placement', $this::PLACE_HEAD);
-        $this->set('trackingId', '');
-        $this->set('anonymizeIp', 1);
-        $this->set('inject', '');
-        $this->set('selector', '');
+        $this->set('trackingId', ''); // empty text field
+        $this->set('anonymizeIp', 1); // checked checbox
+        $this->set('inject', ''); // unchecked checkbox
+        $this->set('selector', ''); // empty selector
     }
 
+    /**
+     * summary Decides if tracking code should be included and sets up hooks
+     */
     public function ready()
     {
         // do nothing if it is admin page
@@ -46,7 +56,6 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         ) return;
 
         // do not inject the code if tracking ID is not filled
-        bd(empty($this->trackingId));
         if (!empty($this->trackingId)) {
             // Hook into ___render() method in Page class
             $this->addHookAfter('Page::render', $this, 'onPageRender');
@@ -55,6 +64,11 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         }
     }
 
+    /**
+     * summary Modifies page render output
+     *
+     * @param HookEvent $e
+     */
     protected function onPageRender(HookEvent $e)
     {
         $markup = $e->return;
@@ -75,6 +89,13 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $e->return = str_replace($pointer, $code . $pointer, $e->return);
     }
 
+    /**
+     * summary Builds tracking code
+     *
+     * @param array $options tracking ID, and other options for ga-lite
+     * @param bool $inject inject the contents of tracking scripts
+     * @return string tracking script
+     */
     public function ___renderTrackingCode(array $options, $inject = false)
     {
         $code = "";
@@ -105,6 +126,12 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         return $code;
     }
 
+    /**
+     * summary Sets up module configuration page
+     *
+     * @param InputfieldWrapper $wrapper
+     * @return InputfieldWrapper
+     */
     public function getModuleConfigInputfields(InputfieldWrapper $wrapper)
     {
         // TRACKING ID ====================
@@ -112,6 +139,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $tracking = $this->modules->InputfieldText;
         $tracking->name = 'trackingId';
         $tracking->label = $this->_('Tracking ID');
+        // use previously saved tracking ID, defaults to empty string
         $tracking->value = $this->trackingId;
 
         $tracking->description = $this->_('The UA code from your Google Analytics admin panel.');
@@ -119,7 +147,6 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $tracking->placeholder = 'UA-XXXXX';
         $tracking->required = true;
         $tracking->columnWidth = 50;
-        // fill the field with saved value, or put empty string
         $wrapper->add($tracking);
 
         // ANONYMIZE IP ====================
@@ -127,7 +154,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $anonymize = $this->modules->InputfieldCheckbox;
         $anonymize->name = 'anonymizeIp';
         $anonymize->label = $this->_('Anonymize IPs');
-        // check if field is populated, default to checked
+        // use previously saved value, defaults to checked
         $anonymize->attr('checked', $this->anonymizeIp);
 
         $anonymize->description = $this->_('Sets the aip flag that advices GA to anonymize the IP address');
@@ -151,7 +178,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $selector = $this->modules->InputfieldSelector;
         $selector->name = 'selector';
         $selector->label = $this->_('Select pages');
-        // fill it with any value saved before
+        // use previously saved value, defaults to empty string
         $selector->value = $this->selector;
 
         $selector->description = $this->_('Build a selector for pages to put the tracking code');
@@ -166,7 +193,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $inject->label = $this->_('Inject script');
         $inject->description = $this->_('Write GALite js file directly into HTML, instead of linking it.');
         $inject->notes = $this->_("Since the library is less than a KB in size, it won't slow down the page a lot, but it won't be cacheable either.");
-        // check if field is populated
+        // use previously saved value, defaults to unchecked
         $inject->attr('checked', $this->inject);
         $inject->columnWidth = 50;
         $advanced->add($inject);
@@ -180,11 +207,12 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         $place->notes = $this->_("Placing scripts in `</head>` is recommended, but it's render blocking. But putting it before `</body>` may not detect partial loads for heavy pages.");
         $place->addOption($this::PLACE_HEAD, $this->_('Before `</head>`'));
         $place->addOption($this::PLACE_BODY, $this->_('Before `</body>`'));
+        // previously saved value, defaults to </head>
         $place->value = $this->placement;
         $place->columnWidth = 50;
         $advanced->add($place);
 
-        // add the advanced container to wrapper
+        // add the container to wrapper
         $wrapper->add($advanced);
         return $wrapper;
     }
