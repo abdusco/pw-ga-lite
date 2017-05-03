@@ -22,7 +22,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
     {
         return [
             'title' => 'Google Analytics Lite',
-            'summary' => 'Adds Google Analytics tracking to pages using GALite',
+            'summary' => 'Adds Google Analytics tracking to pages using `ga-lite`',
             'version' => '0.0.1',
             'author' => 'abdus',
             'href' => 'https://abdus.co',
@@ -43,7 +43,7 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
         // then override with our values
         $this->set('placement', $this::PLACE_HEAD);
         $this->set('trackingId', ''); // empty text field
-        $this->set('anonymizeIp', 1); // checked checbox
+        $this->set('anonymizeIp', 1); // checked checkbox
         $this->set('inject', ''); // unchecked checkbox
         $this->set('selector', ''); // empty selector
     }
@@ -53,20 +53,28 @@ class MarkupGALite extends WireData implements Module, ConfigurableModule
      */
     public function ready()
     {
-        // do nothing if it is admin page
-        if (strpos($this->page->url, $this->config->urls->admin) === 0) return;
+        // do nothing if tracking ID is empty
+        if (!$this->trackingId) {
+            // after login warn superuser about missing tracking ID
+            $this->addHookAfter('Session::loginSuccess', function (HookEvent $e) {
+                /* @var $user User */
+                $user = $e->arguments(0);
+                if (!$user->isSuperuser()) return;
 
-        // do nothing if page does not match the selector.
-        if (!empty($this->selector) // and it shouldn't be empty
+                $this->warning("$this: Tracking ID is not filled, tracking code will not be injected");
+            });
+
+            return;
+        } // do nothing if it is admin page
+        else if (strpos($this->page->url, $this->config->urls->admin) === 0) return;
+        // do nothing if current page does not match the selector.
+        else if (!empty($this->selector) // and it shouldn't be empty
             && !$this->page->matches($this->selector)
         ) return;
 
-        // do not inject the code if tracking ID is not filled
-        if (!empty($this->trackingId)) {
+        else {
             // Hook into ___render() method in Page class
             $this->addHookAfter('Page::render', $this, 'onPageRender');
-        } else {
-            $this->warning("$this: Tracking ID is not filled, tracking code will not be injected", true);
         }
     }
 
