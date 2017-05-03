@@ -1,6 +1,12 @@
 <?php namespace ProcessWire;
-
 /**
+ * MarkupGALite
+ *
+ * Provides a wrapper for ga-lite, an unofficial Google Analytics client
+ *
+ * ProcessWire 3.x, Copyright 2017 by Abdussamet Kocak
+ * https://abdus.co/
+ *
  * Class MarkupGALite
  * @package ProcessWire
  * @method renderTrackingCode(array $options, bool $inject) string

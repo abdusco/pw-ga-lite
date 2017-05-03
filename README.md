@@ -5,12 +5,12 @@ You can read the detailed [blog post][blog-post] about how I built it.
 MarkupGALite is a wrapper around ga-lite, a lightweight alternative to official Google Analytics client. It only includes `pageview` event. It's cacheable, and its small print allows it to be injected / linked into page without much load.
  
 The module offers several features:
-- Offers a configuration page for:
+- A configuration page for:
     - Setting up tracking ID and IP anonymization
     - Specifying pages to inject the script
     - Choosing where to place the script (before `</head>` or `</body>`)
     - Choosing whether to link or inject complete script into HTML
-- It's hookable. By hooking `MarkupGALite::renderTrackingCode`, it's possible to change the render behavior.
+- Hookable. By hooking `MarkupGALite::renderTrackingCode`, it's possible to change the rendered tracking code.
 - Translatable. All strings are marked as translatable.
 
 ## Usage
