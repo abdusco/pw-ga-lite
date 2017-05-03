@@ -2,7 +2,8 @@
 /**
  * MarkupGALite
  *
- * Provides a wrapper for ga-lite, an unofficial Google Analytics client
+ * A wrapper module for ga-lite, an unofficial Google Analytics client
+ * https://github.com/jehna/ga-lite
  *
  * ProcessWire 3.x, Copyright 2017 by Abdussamet Kocak
  * https://abdus.co/
